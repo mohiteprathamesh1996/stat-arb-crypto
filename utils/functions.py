@@ -189,7 +189,6 @@ def get_cointegrated_pairs(prices):
     from itertools import combinations
     import re
 
-
     pairs = pd.DataFrame(
         list(
             combinations(
@@ -222,7 +221,9 @@ def get_cointegrated_pairs(prices):
             axis=1
     ).dropna()
 
-    pairs = pairs.query(expr="correlation > 0.95").apply(
+    pairs = pairs[
+        pairs["correlation"].abs()>0.95
+    ].apply(
         lambda row: ols_fit(
             data=prices, 
             coin1=row['coin1'], 
@@ -314,9 +315,9 @@ def get_long_short_signals(prices, select_pairs, rolling_params, threshold):
     
     in_sample_positions.ffill(inplace=True)
 
-    in_sample_positions = in_sample_positions.divide(
-        in_sample_positions.abs().sum(axis=1), axis=0
-    ).fillna(0)
+    # in_sample_positions = in_sample_positions.divide(
+    #     in_sample_positions.abs().sum(axis=1), axis=0
+    # ).fillna(0)
 
     return in_sample_positions
 
