@@ -479,7 +479,7 @@ def create_surface_plots(df, values, cmap="viridis"):
     import numpy as np
 
     n = len(values)
-    ncols = 3
+    ncols = 2
     nrows = int(np.ceil(n / ncols))
 
     fig = plt.figure(figsize=(6 * ncols, 5 * nrows))
@@ -510,7 +510,6 @@ def create_surface_plots(df, values, cmap="viridis"):
 
         fig.colorbar(surf, ax=ax, shrink=0, aspect=1)
 
-    plt.suptitle(
-        "Evaluating Strategy Sensitivity to Entry and Exit Thresholds\n\n")
+    # plt.suptitle("Evaluating Strategy Sensitivity to Entry and Exit Thresholds\n\n")
     plt.tight_layout()
     plt.show()
