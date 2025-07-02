@@ -45,7 +45,6 @@ crypto-pairs-trading/
 ├── visualization.py                                # Custom plots: signal overlays, trade flows, 3D threshold surfaces
 ├── README.md                                       # Project documentation (this file)
 ├── requirements.txt                                # Python dependencies
-└── crypto_pairs_trading_report.tex                 # Academic thesis/report in LaTeX (optional)
 ```
 
 
