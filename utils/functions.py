@@ -8,8 +8,6 @@ from scipy import stats  # type: ignore
 from tqdm import tqdm  # type: ignore
 import statsmodels.api as sm  # type: ignore
 from statsmodels.tsa.stattools import adfuller  # type: ignore
-from scipy.optimize import minimize  # type: ignore
-
 
 def get_all_coins(api_key):
     """
