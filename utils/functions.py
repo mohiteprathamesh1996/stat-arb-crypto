@@ -9,6 +9,7 @@ from tqdm import tqdm  # type: ignore
 import statsmodels.api as sm  # type: ignore
 from statsmodels.tsa.stattools import adfuller  # type: ignore
 
+
 def get_all_coins(api_key):
     """
     Fetches all available cryptocurrencies from the CoinGecko Pro API using paginated requests.
