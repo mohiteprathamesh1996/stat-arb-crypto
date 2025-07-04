@@ -201,20 +201,36 @@ def split_dataset_by_ratio(
 
 
 def ols_fit(data, coin1, coin2):
+    """
+    Run Engle-Granger two-step cointegration test for a given pair of assets.
+
+    Step 1: Estimate linear relationship via OLS
+    Step 2: Test stationarity of residuals via Augmented Dickey-Fuller (ADF) test
+
+    Parameters:
+        data (pd.DataFrame): Price time series with columns as asset tickers
+        coin1 (str): First asset in pair (independent variable)
+        coin2 (str): Second asset in pair (dependent variable)
+
+    Returns:
+        pd.Series: Regression parameters and ADF test results
+    """
     import pandas as pd
     import statsmodels.api as sm
     from statsmodels.tsa.stattools import adfuller
 
+    # Subset and clean data for the selected pair
     df = data[[coin1, coin2]].dropna()
 
+    # Step 1: Run OLS regression: coin2 ~ alpha + beta * coin1
     X = sm.add_constant(df[coin1])
     y = df[coin2]
-
     model = sm.OLS(y, X).fit()
-    adf_residual_stationarity = adfuller(
-        x=model.resid
-    )
 
+    # Step 2: Test if the residuals are stationary (i.e., mean-reverting)
+    adf_residual_stationarity = adfuller(x=model.resid)
+
+    # Collect results: alpha, beta, ADF stat, p-value
     results = {
         "coin1": coin1,
         "coin2": coin2,
@@ -227,62 +243,71 @@ def ols_fit(data, coin1, coin2):
     return pd.Series(results)
 
 
-def get_cointegrated_pairs(prices):
+
+def get_cointegrated_pairs(prices, top_n=30):
+    """
+    Identify top cointegrated asset pairs using Engle-Granger method with strong correlation filter.
+
+    Logic:
+    - Filter out synthetically related assets via name matching
+    - Select highly correlated pairs
+    - Apply OLS + ADF on each pair
+    - Select pairs with statistically significant mean-reverting spread
+
+    Parameters:
+        prices (pd.DataFrame): Time series price data (columns = asset tickers)
+        top_n (int): Number of top cointegrated pairs to return based on ADF statistic
+
+    Returns:
+        np.ndarray: Array of (coin1, coin2) tuples that passed cointegration test
+    """
     from itertools import combinations
     import re
 
+    # Step 1: Create all unique (unordered) asset combinations
     pairs = pd.DataFrame(
-        list(
-            combinations(
-                iterable=prices.columns,
-                r=2
-            )
-        ),
+        list(combinations(prices.columns, r=2)),
         columns=["coin1", "coin2"]
     )
 
+    # Step 2: Remove synthetically linked pairs (e.g., BTC and BTCB) by name match
     pairs["str_match"] = pairs.apply(
         lambda x: len(
             re.findall(re.escape(x['coin1']), x['coin2']) or
-            re.findall(re.escape(x['coin2']), x['coin1'])),
+            re.findall(re.escape(x['coin2']), x['coin1'])
+        ),
         axis=1
     )
+    pairs = pairs.query("str_match < 1").drop(columns=["str_match"]).reset_index(drop=True)
 
-    pairs = pairs.query(
-        expr="str_match < 1"
-    ).reset_index(
-        drop=True
-    ).drop(
-        columns=["str_match"]
-    )
-
+    # Step 3: Compute Pearson correlation for each pair and retain only highly correlated pairs
     pairs["correlation"] = pairs.apply(
         lambda row: np.corrcoef(
             prices[row["coin1"]],
-            prices[row["coin2"]])[0, 1],
+            prices[row["coin2"]]
+        )[0, 1],
         axis=1
     ).dropna()
+    
+    pairs = pairs[pairs["correlation"] > 0.95]  # Strong linear co-movement filter
 
-    pairs = pairs[
-        # pairs["correlation"].abs()>0.95
-        pairs["correlation"] > 0.96
-    ].apply(
-        lambda row: ols_fit(
-            data=prices,
-            coin1=row['coin1'],
-            coin2=row['coin2']
-        ),
+    # Step 4: Apply Engle-Granger test (via ols_fit) to remaining pairs
+    pairs = pairs.apply(
+        lambda row: ols_fit(data=prices, coin1=row['coin1'], coin2=row['coin2']),
         axis=1
     ).query(
-        expr="adf_p_value < 0.01"
-    ).reset_index(drop=True)
+        expr = "adf_p_value < 0.01"
+        ).reset_index(drop=True)  # Strong stationarity threshold
 
-    pairs = pairs.loc[
-        pairs.loc[
-            pairs.groupby('coin1')['adf_test_statistic'].idxmax()
-        ].groupby('coin2')['adf_test_statistic'].idxmax()
-    ].reset_index(drop=True)
+    # Step 5: Rank pairs by most negative (strongest) ADF test statistics
+    pairs = pairs.sort_values(
+        by="adf_test_statistic", 
+        ascending=True
+        ).query(
+            expr = "adf_p_value > 0"
+            ).head(top_n).reset_index(drop=True)
 
+    # Final output: array of (coin1, coin2)
     final_pairs = pairs[["coin1", "coin2"]].values
 
     return final_pairs
@@ -478,7 +503,7 @@ def create_surface_plots(df, values, cmap="viridis"):
     import numpy as np
 
     n = len(values)
-    ncols = 2
+    ncols = 4
     nrows = int(np.ceil(n / ncols))
 
     fig = plt.figure(figsize=(6 * ncols, 5 * nrows))
